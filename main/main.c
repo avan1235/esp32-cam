@@ -16,7 +16,7 @@
 #define ESP_WIFI_PASS      "awesomeMIM"
 #define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
 
-static const char *TAG = "wifi softAP";
+static const char *TAG = "esp32-cam";
 
 static void wifi_event_handler(
         void *arg,
@@ -51,7 +51,7 @@ void wifi_init_softap() {
                     .channel = ESP_WIFI_CHANNEL,
                     .password = ESP_WIFI_PASS,
                     .max_connection = MAX_STA_CONN,
-                    .authmode = WIFI_AUTH_WPA3_PSK,
+                    .authmode = WIFI_AUTH_WPA2_PSK,
                     .pmf_cfg = {
                             .required = false,
                     },
