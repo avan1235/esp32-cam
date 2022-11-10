@@ -51,12 +51,13 @@ void wifi_init_softap() {
                     .channel = ESP_WIFI_CHANNEL,
                     .password = ESP_WIFI_PASS,
                     .max_connection = MAX_STA_CONN,
-                    .authmode = WIFI_AUTH_WPA2_PSK,
+                    .authmode = WIFI_AUTH_WPA3_PSK,
                     .pmf_cfg = {
                             .required = false,
                     },
             },
     };
+
     uint8_t mac[6];
     ESP_ERROR_CHECK(esp_read_mac((uint8_t *) mac, ESP_MAC_WIFI_SOFTAP));
     uint8_t ssid[sizeof(wifi_config.ap.ssid)] = {0};
