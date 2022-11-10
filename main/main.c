@@ -51,7 +51,7 @@ void wifi_init_softap() {
                     .channel = ESP_WIFI_CHANNEL,
                     .password = ESP_WIFI_PASS,
                     .max_connection = MAX_STA_CONN,
-                    .authmode = WIFI_AUTH_WPA_WPA2_PSK,
+                    .authmode = WIFI_AUTH_WPA2_PSK,
                     .pmf_cfg = {
                             .required = false,
                     },
