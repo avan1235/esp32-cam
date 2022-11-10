@@ -10,10 +10,10 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#define ESP_WIFI_PASS      CONFIG_ESP_WIFI_PASSWORD
 #define ESP_WIFI_CHANNEL   CONFIG_ESP_WIFI_CHANNEL
 #define MAX_STA_CONN       CONFIG_ESP_MAX_STA_CONN
 
+#define ESP_WIFI_PASS      "awesomeMIM"
 #define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
 
 static const char *TAG = "wifi softAP";

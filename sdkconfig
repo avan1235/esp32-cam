@@ -313,8 +313,6 @@ CONFIG_PARTITION_TABLE_MD5=y
 #
 # Example Configuration
 #
-CONFIG_ESP_WIFI_SSID="Internet ESP"
-CONFIG_ESP_WIFI_PASSWORD="awesomeMIM"
 CONFIG_ESP_WIFI_CHANNEL=7
 CONFIG_ESP_MAX_STA_CONN=4
 # end of Example Configuration
