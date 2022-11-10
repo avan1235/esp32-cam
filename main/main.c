@@ -6,33 +6,20 @@
 #include "esp_event.h"
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "esp_system.h"
+#include "sys/param.h"
+#include "esp_netif.h"
+#include "esp_http_server.h"
 
-#include "lwip/err.h"
-#include "lwip/sys.h"
+#define ESP_WIFI_CHANNEL   CONFIG_ESP_WIFI_CHANNEL
+#define MAX_STA_CONN       CONFIG_ESP_MAX_STA_CONN
+
+#define ESP_WIFI_PASS      "awesomeMIM"
+#define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
 
 static const char *TAG = "esp32-cam";
 
 //////////////////////////////// WEBSOCKET
-
-/* WebSocket Echo Server Example
-
-   This example code is in the Public Domain (or CC0 licensed, at your option.)
-
-   Unless required by applicable law or agreed to in writing, this
-   software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
-   CONDITIONS OF ANY KIND, either express or implied.
-*/
-
-#include <esp_wifi.h>
-#include <esp_event.h>
-#include <esp_log.h>
-#include <esp_system.h>
-#include <nvs_flash.h>
-#include <sys/param.h>
-#include "esp_netif.h"
-#include "esp_eth.h"
-
-#include <esp_http_server.h>
 
 /*
  * Structure holding server handle
@@ -44,14 +31,13 @@ struct async_resp_arg {
     int fd;
 };
 
-/*
- * async send function, which we put into the httpd work queue
- */
 static void ws_async_send(void *arg) {
     static const char *data = "Async data";
+
     struct async_resp_arg *resp_arg = arg;
     httpd_handle_t hd = resp_arg->hd;
     int fd = resp_arg->fd;
+
     httpd_ws_frame_t ws_pkt;
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.payload = (uint8_t *) data;
@@ -69,13 +55,9 @@ static esp_err_t trigger_async_send(httpd_handle_t handle, httpd_req_t *req) {
     return httpd_queue_work(handle, ws_async_send, resp_arg);
 }
 
-/*
- * This handler echos back the received ws data
- * and triggers an async send if certain message received
- */
 static esp_err_t echo_handler(httpd_req_t *req) {
     if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "Handshake done, the new connection was opened");
+        ESP_LOGI(TAG, "handshake done, the new connection was opened");
         return ESP_OK;
     }
     httpd_ws_frame_t ws_pkt;
@@ -148,13 +130,6 @@ static httpd_handle_t start_webserver(void) {
 
 //////////////////////////////// WEBSOCKET
 
-
-#define ESP_WIFI_CHANNEL   CONFIG_ESP_WIFI_CHANNEL
-#define MAX_STA_CONN       CONFIG_ESP_MAX_STA_CONN
-
-#define ESP_WIFI_PASS      "awesomeMIM"
-#define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
-
 static void wifi_event_handler(
         void *arg,
         esp_event_base_t event_base,
@@ -225,10 +200,10 @@ void init_nvs() {
 }
 
 void app_main() {
+//    esp_log_level_set("*", ESP_LOG_NONE);
     init_nvs();
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init_softap();
-    static httpd_handle_t server = NULL;
-    server = start_webserver();
+    start_webserver();
 }
