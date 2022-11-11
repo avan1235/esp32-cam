@@ -10,8 +10,6 @@
 #include "sys/param.h"
 #include "esp_netif.h"
 #include "esp_http_server.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 
 #ifndef portTICK_RATE_MS
 #define portTICK_RATE_MS portTICK_PERIOD_MS
@@ -38,10 +36,10 @@
 #define CAM_PIN_HREF 23
 #define CAM_PIN_PCLK 22
 
-#define ESP_WIFI_CHANNEL   CONFIG_ESP_WIFI_CHANNEL
-#define MAX_STA_CONN       CONFIG_ESP_MAX_STA_CONN
+#define ESP_WIFI_CHANNEL CONFIG_ESP_WIFI_CHANNEL
+#define MAX_STA_CONN     CONFIG_ESP_MAX_STA_CONN
 
-#define ESP_WIFI_PASS      "awesomeMIM"
+#define ESP_WIFI_PASS        "awesomeMIM"
 #define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
 
 static const char *TAG = "esp32-cam";
@@ -84,7 +82,7 @@ static camera_config_t camera_config = {
         .pixel_format = PIXFORMAT_JPEG, // YUV422,GRAYSCALE,RGB565,JPEG
         .frame_size = FRAMESIZE_HD,    // QQVGA-UXGA, For ESP32, do not use sizes above QVGA when not JPEG. The performance of the ESP32-S series has improved a lot, but JPEG mode always gives better frame rates.
 
-        .jpeg_quality = 12, //0-63, for OV series camera sensors, lower number means higher quality
+        .jpeg_quality = 7, //0-63, for OV series camera sensors, lower number means higher quality
         .fb_count = 1,       //When jpeg mode is used, if fb_count more than one, the driver will work in continuous mode.
         .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
@@ -97,12 +95,6 @@ static esp_err_t init_camera() {
     }
     return ESP_OK;
 }
-
-
-//////////////////////////////// CAMERA
-
-
-//////////////////////////////// WEBSOCKET
 
 static esp_err_t receive_frame_len(
         httpd_req_t *req,
@@ -201,7 +193,7 @@ static esp_err_t camera_handler(
     return ret;
 }
 
-static const httpd_uri_t ws = {
+static const httpd_uri_t CAMERA_CONTROL_WS = {
         .uri        = "/ws",
         .method     = HTTP_GET,
         .handler    = camera_handler,
@@ -209,23 +201,19 @@ static const httpd_uri_t ws = {
         .is_websocket = true
 };
 
-
 static httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
-    ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
+    ESP_LOGI(TAG, "starting server on port %d", config.server_port);
     if (httpd_start(&server, &config) != ESP_OK) {
-        ESP_LOGE(TAG, "Error starting server!");
+        ESP_LOGE(TAG, "httpd_start failed starting server");
         return NULL;
     }
-
-    ESP_LOGI(TAG, "Registering URI handlers");
-    httpd_register_uri_handler(server, &ws);
+    ESP_LOGI(TAG, "registering URI handlers");
+    httpd_register_uri_handler(server, &CAMERA_CONTROL_WS);
     return server;
 }
-
-//////////////////////////////// WEBSOCKET
 
 static void wifi_event_handler(
         void *arg,
@@ -235,10 +223,10 @@ static void wifi_event_handler(
 ) {
     if (event_id == WIFI_EVENT_AP_STACONNECTED) {
         wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" join, AID=%d", MAC2STR(event->mac), event->aid);
+        ESP_LOGI(TAG, "station "MACSTR" joined, AID=%d", MAC2STR(event->mac), event->aid);
     } else if (event_id == WIFI_EVENT_AP_STADISCONNECTED) {
         wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *) event_data;
-        ESP_LOGI(TAG, "station "MACSTR" leave, AID=%d", MAC2STR(event->mac), event->aid);
+        ESP_LOGI(TAG, "station "MACSTR" left, AID=%d", MAC2STR(event->mac), event->aid);
     }
 }
 
