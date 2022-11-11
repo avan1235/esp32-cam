@@ -10,7 +10,6 @@
 #include "sys/param.h"
 #include "esp_netif.h"
 #include "esp_http_server.h"
-
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -22,7 +21,7 @@
 
 
 #define CAM_PIN_PWDN 32
-#define CAM_PIN_RESET -1 //software reset will be performed
+#define CAM_PIN_RESET (-1) // software reset
 #define CAM_PIN_XCLK 0
 #define CAM_PIN_SIOD 26
 #define CAM_PIN_SIOC 27
@@ -47,9 +46,11 @@
 
 static const char *TAG = "esp32-cam";
 
-
-//////////////////////////////// CAMERA
-
+#define free_ptr(ptr) do {         \
+    void **temp = (void **) (ptr); \
+    free(*temp);                   \
+    *temp = NULL;                  \
+    } while(false)
 
 static camera_config_t camera_config = {
         .pin_pwdn = CAM_PIN_PWDN,
@@ -70,7 +71,7 @@ static camera_config_t camera_config = {
         .pin_href = CAM_PIN_HREF,
         .pin_pclk = CAM_PIN_PCLK,
 
-        //XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
+        // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
         .xclk_freq_hz = 20000000,
         .ledc_timer = LEDC_TIMER_0,
         .ledc_channel = LEDC_CHANNEL_0,
@@ -98,45 +99,69 @@ static esp_err_t init_camera() {
 
 //////////////////////////////// WEBSOCKET
 
-static esp_err_t echo_handler(httpd_req_t *req) {
-    if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "handshake done - new connection was opened");
+static esp_err_t receive_frame_len(
+        httpd_req_t *req,
+        httpd_ws_frame_t *ws_pkt
+) {
+    esp_err_t ret = httpd_ws_recv_frame(req, ws_pkt, /* max_len = */ 0);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_ws_recv_frame failed to get frame len with %d", ret);
+        return ret;
+    }
+    ESP_LOGI(TAG, "frame len is %d", ws_pkt->len);
+    return ESP_OK;
+}
+
+static esp_err_t receive_frame_payload(
+        httpd_req_t *req,
+        httpd_ws_frame_t *ws_pkt,
+        uint8_t **buf
+) {
+    if (ws_pkt->len == 0) {
+        ESP_LOGI(TAG, "received frame with empty payload");
         return ESP_OK;
     }
-    ESP_LOGI(TAG, "running handler with no handshake");
-    httpd_ws_frame_t ws_pkt;
+    *buf = calloc(1, ws_pkt->len + 1);
+    if (*buf == NULL) {
+        ESP_LOGE(TAG, "failed to calloc memory for buf");
+        return ESP_ERR_NO_MEM;
+    }
+    ws_pkt->payload = *buf;
+    esp_err_t ret = httpd_ws_recv_frame(req, ws_pkt, /* max_len = */ ws_pkt->len);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
+        return ret;
+    }
+    ESP_LOGI(TAG, "got packet payload");
+    ESP_LOGI(TAG, "packet type: %d", ws_pkt->type);
+    return ESP_OK;
+}
+
+static esp_err_t camera_handler(
+        httpd_req_t *req
+) {
+    if (req->method == HTTP_GET) {
+        ESP_LOGI(TAG, "camera_handler - handshake done after new connection was opened");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "running camera_handler with no handshake");
+
+    esp_err_t ret = ESP_OK;
     uint8_t *buf = NULL;
+    httpd_ws_frame_t ws_pkt;
+
     memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_pkt.type = HTTPD_WS_TYPE_TEXT;
-    esp_err_t ret = ESP_OK;
 
-    {
-        const size_t max_len = 0;
-        ret = httpd_ws_recv_frame(req, &ws_pkt, max_len);
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "httpd_ws_recv_frame failed to get frame len with %d", ret);
-            return ret;
-        }
-        ESP_LOGI(TAG, "frame len is %d", ws_pkt.len);
+    ret = receive_frame_len(req, &ws_pkt);
+    if (ret != ESP_OK) {
+        return ret;
     }
-    {
-        if (ws_pkt.len) {
-            buf = calloc(1, ws_pkt.len + 1);
-            if (buf == NULL) {
-                ESP_LOGE(TAG, "Failed to calloc memory for buf");
-                return ESP_ERR_NO_MEM;
-            }
-            ws_pkt.payload = buf;
-            const size_t max_len = ws_pkt.len;
-            ret = httpd_ws_recv_frame(req, &ws_pkt, max_len);
-            if (ret != ESP_OK) {
-                ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
-                free(buf);
-                return ret;
-            }
-            ESP_LOGI(TAG, "Got packet with message: %s", ws_pkt.payload);
-        }
-        ESP_LOGI(TAG, "Packet type: %d", ws_pkt.type);
+
+    ret = receive_frame_payload(req, &ws_pkt, &buf);
+    if (ret != ESP_OK) {
+        free_ptr(&buf);
+        return ret;
     }
 
     if (ws_pkt.type == HTTPD_WS_TYPE_TEXT && strcmp((char *) ws_pkt.payload, "s") == 0) {
@@ -156,14 +181,14 @@ static esp_err_t echo_handler(httpd_req_t *req) {
             ESP_LOGE(TAG, "httpd_ws_send_frame failed sending frame");
         }
     }
-    free(buf);
+    free_ptr(&buf);
     return ret;
 }
 
 static const httpd_uri_t ws = {
         .uri        = "/ws",
         .method     = HTTP_GET,
-        .handler    = echo_handler,
+        .handler    = camera_handler,
         .user_ctx   = NULL,
         .is_websocket = true
 };
