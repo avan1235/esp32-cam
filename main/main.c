@@ -17,6 +17,7 @@
 
 #include "esp_camera.h"
 
+#define MAX_FRAME_SIZE 13
 
 #define CAM_PIN_PWDN 32
 #define CAM_PIN_RESET (-1) // software reset
@@ -36,6 +37,8 @@
 #define CAM_PIN_HREF 23
 #define CAM_PIN_PCLK 22
 
+#define FLASH_LED_GPIO GPIO_NUM_4
+
 #define ESP_WIFI_CHANNEL CONFIG_ESP_WIFI_CHANNEL
 #define MAX_STA_CONN     CONFIG_ESP_MAX_STA_CONN
 
@@ -43,6 +46,7 @@
 #define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
 
 static const char *TAG = "esp32-cam";
+static uint8_t LED_STATE = 0;
 
 #define free_ptr(ptr) do {         \
     void **temp = (void **) (ptr); \
@@ -54,6 +58,17 @@ static const char *TAG = "esp32-cam";
 #define WS_CMD_SHOOT "s"
 #define WS_CMD_INCREASE_RESOLUTION "i"
 #define WS_CMD_DECREASE_RESOLUTION "d"
+#define WS_CMD_CHANGE_FLASH_LED "l"
+
+static void configure_led() {
+    gpio_reset_pin(FLASH_LED_GPIO);
+    gpio_set_direction(FLASH_LED_GPIO, GPIO_MODE_OUTPUT);
+}
+
+static void switch_flash_led() {
+    LED_STATE = !LED_STATE;
+    gpio_set_level(FLASH_LED_GPIO, LED_STATE);
+}
 
 static camera_config_t camera_config = {
         .pin_pwdn = CAM_PIN_PWDN,
@@ -129,17 +144,16 @@ static esp_err_t receive_frame_payload(
         ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
         return ret;
     }
-    ESP_LOGI(TAG, "got packet payload");
-    ESP_LOGI(TAG, "packet type: %d", ws_pkt->type);
+    ESP_LOGI(TAG, "got packet payload - packet type: %d", ws_pkt->type);
     return ESP_OK;
 }
 
 static esp_err_t send_picture(
         httpd_req_t *req
 ) {
-    ESP_LOGI(TAG, "taking picture");
+//    ESP_LOGI(TAG, "taking picture");
     camera_fb_t *pic = esp_camera_fb_get();
-    ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
+//    ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
 
     httpd_ws_frame_t ws_send_pkt;
     memset(&ws_send_pkt, 0, sizeof(httpd_ws_frame_t));
@@ -152,6 +166,36 @@ static esp_err_t send_picture(
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "httpd_ws_send_frame failed sending frame");
+    }
+    return ret;
+}
+
+static int increase_resolution() {
+    ESP_LOGI(TAG, "increase camera resolution");
+    sensor_t *camera = esp_camera_sensor_get();
+    framesize_t framesize = camera->status.framesize;
+    ESP_LOGI(TAG, "old frame size: %d", framesize);
+    if (framesize >= MAX_FRAME_SIZE) {
+        return 0;
+    }
+    int ret = camera->set_framesize(camera, framesize + 1);
+    if (!ret) {
+        ESP_LOGE(TAG, "error increasing camera resolution: %d", ret);
+    }
+    return ret;
+}
+
+static int decrease_resolution() {
+    ESP_LOGI(TAG, "decrease camera resolution");
+    sensor_t *camera = esp_camera_sensor_get();
+    framesize_t framesize = camera->status.framesize;
+    ESP_LOGI(TAG, "old frame size: %d", framesize);
+    if (framesize <= 0) {
+        return 0;
+    }
+    int ret = camera->set_framesize(camera, framesize - 1);
+    if (!ret) {
+        ESP_LOGE(TAG, "error decreasing camera resolution: %d", ret);
     }
     return ret;
 }
@@ -184,10 +228,11 @@ static esp_err_t camera_handler(
     if (IS_WS_CMD(ws_recv_pkt, WS_CMD_SHOOT)) {
         ret = send_picture(req);
     } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_INCREASE_RESOLUTION)) {
-
-
+        ret = increase_resolution();
     } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_DECREASE_RESOLUTION)) {
-
+        ret = decrease_resolution();
+    } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_CHANGE_FLASH_LED)) {
+        switch_flash_led();
     }
     free_ptr(&buf);
     return ret;
@@ -288,6 +333,7 @@ void app_main() {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     ESP_ERROR_CHECK(init_camera());
+    configure_led();
     wifi_init_softap();
     start_webserver();
 }
