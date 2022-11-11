@@ -52,6 +52,11 @@ static const char *TAG = "esp32-cam";
     *temp = NULL;                  \
     } while(false)
 
+#define IS_WS_CMD(ws_pkt, cmd) (ws_pkt.type == HTTPD_WS_TYPE_TEXT && strcmp((char *) ws_pkt.payload, cmd) == 0)
+#define WS_CMD_SHOOT "s"
+#define WS_CMD_INCREASE_RESOLUTION "i"
+#define WS_CMD_DECREASE_RESOLUTION "d"
+
 static camera_config_t camera_config = {
         .pin_pwdn = CAM_PIN_PWDN,
         .pin_reset = CAM_PIN_RESET,
@@ -87,7 +92,7 @@ static camera_config_t camera_config = {
 static esp_err_t init_camera() {
     esp_err_t err = esp_camera_init(&camera_config);
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Camera Init Failed");
+        ESP_LOGE(TAG, "esp_camera_init failed");
         return err;
     }
     return ESP_OK;
@@ -137,6 +142,28 @@ static esp_err_t receive_frame_payload(
     return ESP_OK;
 }
 
+static esp_err_t send_picture(
+        httpd_req_t *req
+) {
+    ESP_LOGI(TAG, "taking picture");
+    camera_fb_t *pic = esp_camera_fb_get();
+    ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
+
+    httpd_ws_frame_t ws_send_pkt;
+    memset(&ws_send_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_send_pkt.payload = pic->buf;
+    ws_send_pkt.len = pic->len;
+    ws_send_pkt.type = HTTPD_WS_TYPE_BINARY;
+
+    esp_err_t ret = httpd_ws_send_frame(req, &ws_send_pkt);
+    esp_camera_fb_return(pic);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "httpd_ws_send_frame failed sending frame");
+    }
+    return ret;
+}
+
 static esp_err_t camera_handler(
         httpd_req_t *req
 ) {
@@ -148,38 +175,27 @@ static esp_err_t camera_handler(
 
     esp_err_t ret = ESP_OK;
     uint8_t *buf = NULL;
-    httpd_ws_frame_t ws_pkt;
+    httpd_ws_frame_t ws_recv_pkt;
 
-    memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-    ws_pkt.type = HTTPD_WS_TYPE_TEXT;
+    memset(&ws_recv_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_recv_pkt.type = HTTPD_WS_TYPE_TEXT;
 
-    ret = receive_frame_len(req, &ws_pkt);
+    ret = receive_frame_len(req, &ws_recv_pkt);
     if (ret != ESP_OK) {
         return ret;
     }
-
-    ret = receive_frame_payload(req, &ws_pkt, &buf);
+    ret = receive_frame_payload(req, &ws_recv_pkt, &buf);
     if (ret != ESP_OK) {
         free_ptr(&buf);
         return ret;
     }
+    if (IS_WS_CMD(ws_recv_pkt, WS_CMD_SHOOT)) {
+        ret = send_picture(req);
+    } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_INCREASE_RESOLUTION)) {
 
-    if (ws_pkt.type == HTTPD_WS_TYPE_TEXT && strcmp((char *) ws_pkt.payload, "s") == 0) {
-        ESP_LOGI(TAG, "taking picture...");
-        camera_fb_t *pic = esp_camera_fb_get();
-        ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
 
-        memset(&ws_pkt, 0, sizeof(httpd_ws_frame_t));
-        ws_pkt.payload = pic->buf;
-        ws_pkt.len = pic->len;
-        ws_pkt.type = HTTPD_WS_TYPE_BINARY;
+    } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_DECREASE_RESOLUTION)) {
 
-        ret = httpd_ws_send_frame(req, &ws_pkt);
-        esp_camera_fb_return(pic);
-
-        if (ret != ESP_OK) {
-            ESP_LOGE(TAG, "httpd_ws_send_frame failed sending frame");
-        }
     }
     free_ptr(&buf);
     return ret;
@@ -280,7 +296,6 @@ esp_err_t init_nvs() {
 }
 
 void app_main() {
-    esp_log_level_set("*", ESP_LOG_NONE);
     ESP_ERROR_CHECK(init_nvs());
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
