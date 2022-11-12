@@ -1,41 +1,18 @@
-#include "string.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_mac.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "nvs_flash.h"
-#include "esp_system.h"
-#include "sys/param.h"
-#include "esp_netif.h"
-#include "esp_http_server.h"
+#include <driver/gpio.h>
+#include <string.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <esp_mac.h>
+#include <esp_wifi.h>
+#include <esp_event.h>
+#include <esp_log.h>
+#include <nvs_flash.h>
+#include <esp_system.h>
+#include <sys/param.h>
+#include <esp_netif.h>
+#include <esp_http_server.h>
 
-#ifndef portTICK_RATE_MS
-#define portTICK_RATE_MS portTICK_PERIOD_MS
-#endif
-
-#include "esp_camera.h"
-
-#define MAX_FRAME_SIZE 13
-
-#define CAM_PIN_PWDN 32
-#define CAM_PIN_RESET (-1) // software reset
-#define CAM_PIN_XCLK 0
-#define CAM_PIN_SIOD 26
-#define CAM_PIN_SIOC 27
-
-#define CAM_PIN_D7 35
-#define CAM_PIN_D6 34
-#define CAM_PIN_D5 39
-#define CAM_PIN_D4 36
-#define CAM_PIN_D3 21
-#define CAM_PIN_D2 19
-#define CAM_PIN_D1 18
-#define CAM_PIN_D0 5
-#define CAM_PIN_VSYNC 25
-#define CAM_PIN_HREF 23
-#define CAM_PIN_PCLK 22
+#include "camera.h"
 
 #define FLASH_LED_GPIO GPIO_NUM_4
 
@@ -59,35 +36,6 @@ static const char *TAG = "esp32-cam";
 #define WS_CMD_DECREASE_RESOLUTION "d"
 #define WS_CMD_CHANGE_FLASH_LED "l"
 
-static camera_config_t camera_config = {
-        .pin_pwdn = CAM_PIN_PWDN,
-        .pin_reset = CAM_PIN_RESET,
-        .pin_xclk = CAM_PIN_XCLK,
-        .pin_sccb_sda = CAM_PIN_SIOD,
-        .pin_sccb_scl = CAM_PIN_SIOC,
-
-        .pin_d7 = CAM_PIN_D7,
-        .pin_d6 = CAM_PIN_D6,
-        .pin_d5 = CAM_PIN_D5,
-        .pin_d4 = CAM_PIN_D4,
-        .pin_d3 = CAM_PIN_D3,
-        .pin_d2 = CAM_PIN_D2,
-        .pin_d1 = CAM_PIN_D1,
-        .pin_d0 = CAM_PIN_D0,
-        .pin_vsync = CAM_PIN_VSYNC,
-        .pin_href = CAM_PIN_HREF,
-        .pin_pclk = CAM_PIN_PCLK,
-
-        .xclk_freq_hz = 20000000,
-        .ledc_timer = LEDC_TIMER_0,
-        .ledc_channel = LEDC_CHANNEL_0,
-
-        .pixel_format = PIXFORMAT_JPEG,
-        .frame_size = FRAMESIZE_HD,
-        .jpeg_quality = 12,
-        .fb_count = 1,
-        .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
-};
 
 static const char *INDEX_HTML =
         "<!DOCTYPE html>"
@@ -172,14 +120,6 @@ static void switch_flash_led() {
     gpio_set_level(FLASH_LED_GPIO, LED_STATE);
 }
 
-static esp_err_t init_camera() {
-    esp_err_t err = esp_camera_init(&camera_config);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_camera_init failed");
-        return err;
-    }
-    return ESP_OK;
-}
 
 static esp_err_t receive_frame_len(
         httpd_req_t *req,
@@ -242,35 +182,6 @@ static esp_err_t send_picture(
     return ret;
 }
 
-static int increase_resolution() {
-    ESP_LOGI(TAG, "increase camera resolution");
-    sensor_t *camera = esp_camera_sensor_get();
-    framesize_t framesize = camera->status.framesize;
-    ESP_LOGI(TAG, "old frame size: %d", framesize);
-    if (framesize >= MAX_FRAME_SIZE) {
-        return 0;
-    }
-    int ret = camera->set_framesize(camera, framesize + 1);
-    if (!ret) {
-        ESP_LOGE(TAG, "error increasing camera resolution: %d", ret);
-    }
-    return ret;
-}
-
-static int decrease_resolution() {
-    ESP_LOGI(TAG, "decrease camera resolution");
-    sensor_t *camera = esp_camera_sensor_get();
-    framesize_t framesize = camera->status.framesize;
-    ESP_LOGI(TAG, "old frame size: %d", framesize);
-    if (framesize <= 0) {
-        return 0;
-    }
-    int ret = camera->set_framesize(camera, framesize - 1);
-    if (!ret) {
-        ESP_LOGE(TAG, "error decreasing camera resolution: %d", ret);
-    }
-    return ret;
-}
 
 static esp_err_t receive_ws_pkt(
         httpd_req_t *req,
@@ -337,9 +248,9 @@ static esp_err_t control_handler(
         return ret;
     }
     if (IS_WS_CMD(ws_recv_pkt, WS_CMD_INCREASE_RESOLUTION)) {
-        ret = increase_resolution();
+        ret = change_camera_resolution_by(+1);
     } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_DECREASE_RESOLUTION)) {
-        ret = decrease_resolution();
+        ret = change_camera_resolution_by(-1);
     } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_CHANGE_FLASH_LED)) {
         switch_flash_led();
     }
