@@ -151,9 +151,9 @@ static esp_err_t receive_frame_payload(
 static esp_err_t send_picture(
         httpd_req_t *req
 ) {
-//    ESP_LOGI(TAG, "taking picture");
+    ESP_LOGI(TAG, "taking picture");
     camera_fb_t *pic = esp_camera_fb_get();
-//    ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
+    ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
 
     httpd_ws_frame_t ws_send_pkt;
     memset(&ws_send_pkt, 0, sizeof(httpd_ws_frame_t));
@@ -246,6 +246,74 @@ static const httpd_uri_t CAMERA_CONTROL_WS = {
         .is_websocket = true
 };
 
+static const char *INDEX_HTML = "<!DOCTYPE html>\n"
+                                "<html lang=\"EN\">\n"
+                                "<head>\n"
+                                "    <title>Camera</title>\n"
+                                "    <meta charset=\"utf-8\">\n"
+                                "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">\n"
+                                "    <style>\n"
+                                "        body {\n"
+                                "            margin: 0;\n"
+                                "            width: 100%;\n"
+                                "            height: 100%;\n"
+                                "        }\n"
+                                "\n"
+                                "        img {\n"
+                                "            display: block;\n"
+                                "            margin: auto;\n"
+                                "            max-width: 100%;\n"
+                                "            max-height: 100%;\n"
+                                "            width: auto;\n"
+                                "            height: auto;\n"
+                                "        }\n"
+                                "    </style>\n"
+                                "</head>\n"
+                                "<body>\n"
+                                "<img id=\"video-frame\" alt=\"loading video\" src=\"\"/>\n"
+                                "<script>\n"
+                                "    (function () {\n"
+                                "        const VIDEO_DELAY = 175;\n"
+                                "        const socket = new WebSocket(\"ws://192.168.4.1:80/ws\");\n"
+                                "        const img = document.getElementById(\"video-frame\");\n"
+                                "\n"
+                                "        function receiveVideoFrameLoop() {\n"
+                                "            socket.send(\"s\");\n"
+                                "            setTimeout(receiveVideoFrameLoop, VIDEO_DELAY);\n"
+                                "        }\n"
+                                "\n"
+                                "        socket.binaryType = \"arraybuffer\";\n"
+                                "        socket.onopen = function (event) {\n"
+                                "            receiveVideoFrameLoop();\n"
+                                "        };\n"
+                                "        socket.onmessage = function (event) {\n"
+                                "            const uint_data = new Uint8Array(event.data);\n"
+                                "            const result = btoa([].reduce.call(uint_data, (p, c) => p + String.fromCharCode(c), \"\"));\n"
+                                "            img.src = \"data:image/jpeg;base64,\" + result;\n"
+                                "        };\n"
+                                "        socket.onerror = function (event) {\n"
+                                "            const div = document.createElement(\"div\");\n"
+                                "            div.textContent = \"websocket error\";\n"
+                                "            img.replaceWith(div);\n"
+                                "        }\n"
+                                "    })();\n"
+                                "</script>\n"
+                                "</body>\n"
+                                "</html>";
+
+static esp_err_t index_handler(
+        httpd_req_t *req
+) {
+    return httpd_resp_send(req, INDEX_HTML, HTTPD_RESP_USE_STRLEN);
+}
+
+static const httpd_uri_t INDEX = {
+        .uri       = "/",
+        .method    = HTTP_GET,
+        .handler   = index_handler,
+        .user_ctx  = NULL
+};
+
 static httpd_handle_t start_webserver(void) {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -257,6 +325,7 @@ static httpd_handle_t start_webserver(void) {
     }
     ESP_LOGI(TAG, "registering URI handlers");
     httpd_register_uri_handler(server, &CAMERA_CONTROL_WS);
+    httpd_register_uri_handler(server, &INDEX);
     return server;
 }
 
