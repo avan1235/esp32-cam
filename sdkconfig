@@ -312,11 +312,12 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# Example Configuration
+# ESP WebServer Camera Configuration
 #
-CONFIG_ESP_WIFI_CHANNEL=7
+CONFIG_ESP_WIFI_CHANNEL=1
 CONFIG_ESP_MAX_STA_CONN=4
-# end of Example Configuration
+CONFIG_ESP_WIFI_PASS="awesomeMIM"
+# end of ESP WebServer Camera Configuration
 
 #
 # Compiler options

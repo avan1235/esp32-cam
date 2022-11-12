@@ -1,4 +1,4 @@
-menu "Example Configuration"
+menu "ESP WebServer Camera Configuration"
 
     config ESP_WIFI_CHANNEL
         int "WiFi Channel"
@@ -12,4 +12,10 @@ menu "Example Configuration"
         default 4
         help
             Max number of the STA connects to AP.
+
+    config ESP_WIFI_PASS
+        string "WiFi AP password"
+        default "awesomeMIM"
+        help
+            WiFi password for WPA2-PSK authorization to serer.
 endmenu
