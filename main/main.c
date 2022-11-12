@@ -46,7 +46,6 @@
 #define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
 
 static const char *TAG = "esp32-cam";
-static uint8_t LED_STATE = 0;
 
 #define free_ptr(ptr) do {         \
     void **temp = (void **) (ptr); \
@@ -59,16 +58,6 @@ static uint8_t LED_STATE = 0;
 #define WS_CMD_INCREASE_RESOLUTION "i"
 #define WS_CMD_DECREASE_RESOLUTION "d"
 #define WS_CMD_CHANGE_FLASH_LED "l"
-
-static void configure_led() {
-    gpio_reset_pin(FLASH_LED_GPIO);
-    gpio_set_direction(FLASH_LED_GPIO, GPIO_MODE_OUTPUT);
-}
-
-static void switch_flash_led() {
-    LED_STATE = !LED_STATE;
-    gpio_set_level(FLASH_LED_GPIO, LED_STATE);
-}
 
 static camera_config_t camera_config = {
         .pin_pwdn = CAM_PIN_PWDN,
@@ -89,18 +78,99 @@ static camera_config_t camera_config = {
         .pin_href = CAM_PIN_HREF,
         .pin_pclk = CAM_PIN_PCLK,
 
-        // XCLK 20MHz or 10MHz for OV2640 double FPS (Experimental)
         .xclk_freq_hz = 20000000,
         .ledc_timer = LEDC_TIMER_0,
         .ledc_channel = LEDC_CHANNEL_0,
 
-        .pixel_format = PIXFORMAT_JPEG, // YUV422,GRAYSCALE,RGB565,JPEG
-        .frame_size = FRAMESIZE_HD,    // QQVGA-UXGA, For ESP32, do not use sizes above QVGA when not JPEG. The performance of the ESP32-S series has improved a lot, but JPEG mode always gives better frame rates.
-
-        .jpeg_quality = 7, //0-63, for OV series camera sensors, lower number means higher quality
-        .fb_count = 1,       //When jpeg mode is used, if fb_count more than one, the driver will work in continuous mode.
+        .pixel_format = PIXFORMAT_JPEG,
+        .frame_size = FRAMESIZE_HD,
+        .jpeg_quality = 12,
+        .fb_count = 1,
         .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
+
+static const char *INDEX_HTML =
+        "<!DOCTYPE html>"
+        "<html lang=\"EN\">"
+        "<head>"
+        "    <title>Camera</title>"
+        "    <meta charset=\"utf-8\">"
+        "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">"
+        "    <style>"
+        "        body {"
+        "            margin: 0;"
+        "            width: 100%;"
+        "            height: 100%;"
+        "        }"
+        ""
+        "        img {"
+        "            text-align: center;"
+        "            display: block;"
+        "            margin: auto;"
+        "            max-width: 100%;"
+        "            max-height: 100%;"
+        "            width: auto;"
+        "            height: auto;"
+        "        }"
+        ""
+        "        #btn-container {"
+        "            text-align: center;"
+        "        }"
+        "    </style>"
+        "</head>"
+        "<body>"
+        "<img id=\"video-frame\" alt=\"loading video\" src=\"\"/>"
+        "<div id=\"btn-container\">"
+        "    <button id=\"decrease-btn\">-</button>"
+        "    <button id=\"led-btn\">LED</button>"
+        "    <button id=\"increase-btn\">+</button>"
+        "</div>"
+        "<script>"
+        "    (function () {"
+        "        const VIDEO_DELAY = 125;"
+        "        const camera = new WebSocket(\"ws://192.168.4.1:80/video\");"
+        "        const control = new WebSocket(\"ws://192.168.4.1:80/control\");"
+        "        const img = document.getElementById(\"video-frame\");"
+        ""
+        "        function receiveVideoFrameLoop() {"
+        "            camera.send(\"s\");"
+        "            setTimeout(receiveVideoFrameLoop, VIDEO_DELAY);"
+        "        }"
+        ""
+        "        function setupControlBtn(id, cmd) {"
+        "            const element = document.getElementById(id);"
+        "            element.addEventListener(\"click\", () => control.send(cmd));"
+        "        }"
+        ""
+        "        camera.onerror = (event) => img.alt = \"camera websocket error\";"
+        "        control.onerror = (event) => img.alt = \"control websocket error\";"
+        ""
+        "        camera.binaryType = \"arraybuffer\";"
+        "        camera.onopen = (event) => receiveVideoFrameLoop();"
+        "        camera.onmessage = (event) => {"
+        "            const uint_data = new Uint8Array(event.data);"
+        "            const result = btoa([].reduce.call(uint_data, (p, c) => p + String.fromCharCode(c), \"\"));"
+        "            img.src = \"data:image/jpeg;base64,\" + result;"
+        "        };"
+        "        setupControlBtn(\"decrease-btn\", \"d\");"
+        "        setupControlBtn(\"increase-btn\", \"i\");"
+        "        setupControlBtn(\"led-btn\", \"l\");"
+        "    })();"
+        "</script>"
+        "</body>"
+        "</html>";
+
+static uint8_t LED_STATE = 0;
+
+static void configure_led() {
+    gpio_reset_pin(FLASH_LED_GPIO);
+    gpio_set_direction(FLASH_LED_GPIO, GPIO_MODE_OUTPUT);
+}
+
+static void switch_flash_led() {
+    LED_STATE = !LED_STATE;
+    gpio_set_level(FLASH_LED_GPIO, LED_STATE);
+}
 
 static esp_err_t init_camera() {
     esp_err_t err = esp_camera_init(&camera_config);
@@ -142,6 +212,8 @@ static esp_err_t receive_frame_payload(
     esp_err_t ret = httpd_ws_recv_frame(req, ws_pkt, /* max_len = */ ws_pkt->len);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "httpd_ws_recv_frame failed with %d", ret);
+        ws_pkt->payload = NULL;
+        free_ptr(buf);
         return ret;
     }
     ESP_LOGI(TAG, "got packet payload - packet type: %d", ws_pkt->type);
@@ -200,34 +272,71 @@ static int decrease_resolution() {
     return ret;
 }
 
-static esp_err_t camera_handler(
-        httpd_req_t *req
+static esp_err_t receive_ws_pkt(
+        httpd_req_t *req,
+        httpd_ws_frame_t *ws_recv_pkt,
+        uint8_t **buf
 ) {
-    if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "camera_handler - handshake done after new connection was opened");
-        return ESP_OK;
-    }
-    ESP_LOGI(TAG, "running camera_handler with no handshake");
+    memset(ws_recv_pkt, 0, sizeof(httpd_ws_frame_t));
+    ws_recv_pkt->type = HTTPD_WS_TYPE_TEXT;
 
-    esp_err_t ret = ESP_OK;
-    uint8_t *buf = NULL;
-    httpd_ws_frame_t ws_recv_pkt;
-
-    memset(&ws_recv_pkt, 0, sizeof(httpd_ws_frame_t));
-    ws_recv_pkt.type = HTTPD_WS_TYPE_TEXT;
-
-    ret = receive_frame_len(req, &ws_recv_pkt);
+    esp_err_t ret = receive_frame_len(req, ws_recv_pkt);
     if (ret != ESP_OK) {
         return ret;
     }
-    ret = receive_frame_payload(req, &ws_recv_pkt, &buf);
+    ret = receive_frame_payload(req, ws_recv_pkt, buf);
     if (ret != ESP_OK) {
-        free_ptr(&buf);
+        return ret;
+    }
+    return ret;
+}
+
+static esp_err_t video_handler(
+        httpd_req_t *req
+) {
+    if (req->method == HTTP_GET) {
+        ESP_LOGI(TAG, "video_handler - handshake done after new connection was opened");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "running video_handler with no handshake");
+
+    uint8_t *buf = NULL;
+    httpd_ws_frame_t ws_recv_pkt;
+    esp_err_t ret = receive_ws_pkt(req, &ws_recv_pkt, &buf);
+    if (ret != ESP_OK) {
         return ret;
     }
     if (IS_WS_CMD(ws_recv_pkt, WS_CMD_SHOOT)) {
         ret = send_picture(req);
-    } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_INCREASE_RESOLUTION)) {
+    }
+    free_ptr(&buf);
+    return ret;
+}
+
+static const httpd_uri_t VIDEO_WS = {
+        .uri        = "/video",
+        .method     = HTTP_GET,
+        .handler    = video_handler,
+        .user_ctx   = NULL,
+        .is_websocket = true
+};
+
+static esp_err_t control_handler(
+        httpd_req_t *req
+) {
+    if (req->method == HTTP_GET) {
+        ESP_LOGI(TAG, "control_handler - handshake done after new connection was opened");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "running control_handler with no handshake");
+
+    uint8_t *buf = NULL;
+    httpd_ws_frame_t ws_recv_pkt;
+    esp_err_t ret = receive_ws_pkt(req, &ws_recv_pkt, &buf);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    if (IS_WS_CMD(ws_recv_pkt, WS_CMD_INCREASE_RESOLUTION)) {
         ret = increase_resolution();
     } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_DECREASE_RESOLUTION)) {
         ret = decrease_resolution();
@@ -238,69 +347,13 @@ static esp_err_t camera_handler(
     return ret;
 }
 
-static const httpd_uri_t CAMERA_CONTROL_WS = {
-        .uri        = "/ws",
+static const httpd_uri_t CONTROL_WS = {
+        .uri        = "/control",
         .method     = HTTP_GET,
-        .handler    = camera_handler,
+        .handler    = control_handler,
         .user_ctx   = NULL,
         .is_websocket = true
 };
-
-static const char *INDEX_HTML =
-        "<!DOCTYPE html>"
-        "<html lang=\"EN\">"
-        "<head>"
-        "    <title>Camera</title>"
-        "    <meta charset=\"utf-8\">"
-        "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1, maximum-scale=1\">"
-        "    <style>"
-        "        body {"
-        "            margin: 0;"
-        "            width: 100%;"
-        "            height: 100%;"
-        "        }"
-        ""
-        "        img {"
-        "            display: block;"
-        "            margin: auto;"
-        "            max-width: 100%;"
-        "            max-height: 100%;"
-        "            width: auto;"
-        "            height: auto;"
-        "        }"
-        "    </style>"
-        "</head>"
-        "<body>"
-        "<img id=\"video-frame\" alt=\"loading video\" src=\"\"/>"
-        "<script>"
-        "    (function () {"
-        "        const VIDEO_DELAY = 175;"
-        "        const socket = new WebSocket(\"ws://192.168.4.1:80/ws\");"
-        "        const img = document.getElementById(\"video-frame\");"
-        ""
-        "        function receiveVideoFrameLoop() {"
-        "            socket.send(\"s\");"
-        "            setTimeout(receiveVideoFrameLoop, VIDEO_DELAY);"
-        "        }"
-        ""
-        "        socket.binaryType = \"arraybuffer\";"
-        "        socket.onopen = function (event) {"
-        "            receiveVideoFrameLoop();"
-        "        };"
-        "        socket.onmessage = function (event) {"
-        "            const uint_data = new Uint8Array(event.data);"
-        "            const result = btoa([].reduce.call(uint_data, (p, c) => p + String.fromCharCode(c), \"\"));"
-        "            img.src = \"data:image/jpeg;base64,\" + result;"
-        "        };"
-        "        socket.onerror = function (event) {"
-        "            const div = document.createElement(\"div\");"
-        "            div.textContent = \"websocket error\";"
-        "            img.replaceWith(div);"
-        "        }"
-        "    })();"
-        "</script>"
-        "</body>"
-        "</html>";
 
 static esp_err_t index_handler(
         httpd_req_t *req
@@ -325,7 +378,8 @@ static httpd_handle_t start_webserver(void) {
         return NULL;
     }
     ESP_LOGI(TAG, "registering URI handlers");
-    httpd_register_uri_handler(server, &CAMERA_CONTROL_WS);
+    httpd_register_uri_handler(server, &VIDEO_WS);
+    httpd_register_uri_handler(server, &CONTROL_WS);
     httpd_register_uri_handler(server, &INDEX);
     return server;
 }
