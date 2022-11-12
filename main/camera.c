@@ -33,12 +33,9 @@ static camera_config_t camera_config = {
 };
 
 esp_err_t init_camera() {
-    esp_err_t err = esp_camera_init(&camera_config);
-    if (err != ESP_OK) {
-        ESP_LOGE(TAG, "esp_camera_init failed");
-        return err;
-    }
-    return ESP_OK;
+    esp_err_t ret = ESP_OK;
+    ESP_ERROR_CHECK_RETURN_MSG(esp_camera_init(&camera_config), "esp_camera_init failed");
+    return ret;
 }
 
 int change_camera_resolution_by(int8_t change) {

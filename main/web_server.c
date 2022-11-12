@@ -85,11 +85,8 @@ static esp_err_t receive_frame_len(
         httpd_req_t *req,
         httpd_ws_frame_t *ws_pkt
 ) {
-    esp_err_t ret = httpd_ws_recv_frame(req, ws_pkt, /* max_len = */ 0);
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "httpd_ws_recv_frame failed to get frame len with %d", ret);
-        return ret;
-    }
+    esp_err_t ret = ESP_OK;
+    ESP_ERROR_CHECK_RETURN_MSG(httpd_ws_recv_frame(req, ws_pkt, /* max_len = */ 0), "httpd_ws_recv_frame failed");
     ESP_LOGI(TAG, "frame len is %d", ws_pkt->len);
     return ESP_OK;
 }
@@ -151,15 +148,10 @@ static esp_err_t receive_ws_pkt(
     memset(ws_recv_pkt, 0, sizeof(httpd_ws_frame_t));
     ws_recv_pkt->type = HTTPD_WS_TYPE_TEXT;
 
-    esp_err_t ret = receive_frame_len(req, ws_recv_pkt);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-    ret = receive_frame_payload(req, ws_recv_pkt, buf);
-    if (ret != ESP_OK) {
-        return ret;
-    }
-    return ret;
+    esp_err_t ret = ESP_OK;
+    ESP_ERROR_CHECK_RETURN(receive_frame_len(req, ws_recv_pkt));
+    ESP_ERROR_CHECK_RETURN(receive_frame_payload(req, ws_recv_pkt, buf));
+    return ESP_OK;
 }
 
 static esp_err_t video_handler(
@@ -171,14 +163,15 @@ static esp_err_t video_handler(
     }
     ESP_LOGI(TAG, "running video_handler with no handshake");
 
+    esp_err_t ret = ESP_OK;
     uint8_t *buf = NULL;
     httpd_ws_frame_t ws_recv_pkt;
-    esp_err_t ret = receive_ws_pkt(req, &ws_recv_pkt, &buf);
-    if (ret != ESP_OK) {
-        return ret;
-    }
+
+    ESP_ERROR_CHECK_RETURN(receive_ws_pkt(req, &ws_recv_pkt, &buf));
     if (IS_WS_CMD(ws_recv_pkt, WS_CMD_SHOOT)) {
         ret = send_picture(req);
+    } else {
+        ESP_LOGE(TAG, "received unknown command on video socket");
     }
     free_ptr(&buf);
     return ret;
@@ -201,18 +194,19 @@ static esp_err_t control_handler(
     }
     ESP_LOGI(TAG, "running control_handler with no handshake");
 
+    esp_err_t ret = ESP_OK;
     uint8_t *buf = NULL;
     httpd_ws_frame_t ws_recv_pkt;
-    esp_err_t ret = receive_ws_pkt(req, &ws_recv_pkt, &buf);
-    if (ret != ESP_OK) {
-        return ret;
-    }
+
+    ESP_ERROR_CHECK_RETURN(receive_ws_pkt(req, &ws_recv_pkt, &buf));
     if (IS_WS_CMD(ws_recv_pkt, WS_CMD_INCREASE_RESOLUTION)) {
         ret = change_camera_resolution_by(+1);
     } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_DECREASE_RESOLUTION)) {
         ret = change_camera_resolution_by(-1);
     } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_CHANGE_FLASH_LED)) {
-        switch_flash_led();
+        ret = switch_flash_led();
+    } else {
+        ESP_LOGE(TAG, "received unknown command on control socket");
     }
     free_ptr(&buf);
     return ret;
@@ -239,25 +233,28 @@ static const httpd_uri_t INDEX = {
         .user_ctx  = NULL
 };
 
-httpd_handle_t start_webserver() {
+esp_err_t start_webserver() {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     ESP_LOGI(TAG, "starting server on port %d", config.server_port);
-    if (httpd_start(&server, &config) != ESP_OK) {
-        ESP_LOGE(TAG, "httpd_start failed starting server");
-        return NULL;
-    }
+
+    esp_err_t ret = ESP_OK;
+    ESP_ERROR_CHECK_RETURN_MSG(httpd_start(&server, &config), "httpd_start failed starting server");
+
     ESP_LOGI(TAG, "registering URI handlers");
 
-    httpd_register_uri_handler(server, &VIDEO_WS);
+    ESP_ERROR_CHECK_RETURN_MSG(httpd_register_uri_handler(server, &VIDEO_WS),
+                               "VIDEO_WS httpd_register_uri_handler failed");
     ESP_LOGI(TAG, "VIDEO_WS registered");
 
-    httpd_register_uri_handler(server, &CONTROL_WS);
+    ESP_ERROR_CHECK_RETURN_MSG(httpd_register_uri_handler(server, &CONTROL_WS),
+                               "CONTROL_WS httpd_register_uri_handler failed");
     ESP_LOGI(TAG, "CONTROL_WS registered");
 
-    httpd_register_uri_handler(server, &INDEX);
+    ESP_ERROR_CHECK_RETURN_MSG(httpd_register_uri_handler(server, &INDEX),
+                               "INDEX httpd_register_uri_handler failed");
     ESP_LOGI(TAG, "INDEX registered");
 
-    return server;
+    return ret;
 }

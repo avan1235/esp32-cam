@@ -11,5 +11,5 @@ void app_main() {
     ESP_ERROR_CHECK(init_camera());
     ESP_ERROR_CHECK(configure_flash_led());
     wifi_init_ap();
-    start_webserver();
+    ESP_ERROR_CHECK(start_webserver());
 }

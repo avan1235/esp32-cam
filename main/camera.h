@@ -9,6 +9,8 @@
 #include <esp_log.h>
 #include <esp_err.h>
 
+#include "util.h"
+
 #define MAX_FRAME_SIZE 13
 
 #define CAM_PIN_PWDN 32
