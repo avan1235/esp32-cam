@@ -7,14 +7,14 @@
         ESP_LOGE(TAG, msg);                     \
         return ret;                             \
     }                                           \
-} while(0)
+} while(false)
 
 #define ESP_ERROR_CHECK_RETURN(x) do { \
     ret = (x);                         \
     if (ret != ESP_OK) {               \
         return ret;                    \
     }                                  \
-} while(0)
+} while(false)
 
 #define STRINGIFY(x) #x
 

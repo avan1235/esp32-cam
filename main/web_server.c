@@ -4,16 +4,24 @@
     void **temp = (void **) (ptr); \
     free(*temp);                   \
     *temp = NULL;                  \
-    } while(false)
+} while(false)
 
 #define IS_WS_CMD(ws_pkt, cmd) (ws_pkt.type == WS_CMD_TYPE && strcmp((char *) ws_pkt.payload, cmd) == 0)
 
-#define REGISTER_ROUTE_HANDLER(server, name) do { \
-    ESP_ERROR_CHECK_RETURN_MSG(           \
-        httpd_register_uri_handler(server, &name), \
+#define REGISTER_ROUTE_HANDLER(server, name) do {              \
+    ESP_ERROR_CHECK_RETURN_MSG(                                \
+        httpd_register_uri_handler(server, &name),             \
         STRINGIFY(name) " httpd_register_uri_handler failed"); \
-    ESP_LOGI(TAG, STRINGIFY(name) " registered"); \
-} while(0)
+    ESP_LOGI(TAG, STRINGIFY(name) " registered");              \
+} while(false)
+
+#define RESPOND_STATUS(req, op) do {          \
+    if ((op) == ESP_OK) {                     \
+        return httpd_resp_sendstr(req, NULL); \
+    } else {                                  \
+        return httpd_resp_send_500(req);      \
+    }                                         \
+} while(false)
 
 static const char *TAG = "esp32-cam-web-server";
 
@@ -195,7 +203,7 @@ static esp_err_t control_resolution_increase_handler(
         httpd_req_t *req
 ) {
     ESP_LOGI(TAG, "running control_resolution_increase_handler");
-    return change_camera_resolution_by(+1);
+    RESPOND_STATUS(req, change_camera_resolution_by(+1));
 }
 
 static const httpd_uri_t ROUTE_CONTROL_RESOLUTION_INCREASE = {
@@ -209,7 +217,7 @@ static esp_err_t control_resolution_decrease_handler(
         httpd_req_t *req
 ) {
     ESP_LOGI(TAG, "running control_resolution_decrease_handler");
-    return change_camera_resolution_by(-1);
+    RESPOND_STATUS(req, change_camera_resolution_by(-1));
 }
 
 static const httpd_uri_t ROUTE_CONTROL_RESOLUTION_DECREASE = {
@@ -223,7 +231,7 @@ static esp_err_t control_flash_led_switch_handler(
         httpd_req_t *req
 ) {
     ESP_LOGI(TAG, "running control_flash_led_switch_handler");
-    return switch_flash_led();
+    RESPOND_STATUS(req, switch_flash_led());
 }
 
 static const httpd_uri_t ROUTE_CONTROL_LED_SWITCH = {
