@@ -36,8 +36,8 @@
 <script>
     (function () {
         const VIDEO_DELAY = 125;
-        const camera = new WebSocket("ws://192.168.4.1:80/video");
-        const control = new WebSocket("ws://192.168.4.1:80/control");
+        const ADDRESS = "192.168.4.1:80";
+        const camera = new WebSocket(`ws://${ADDRESS}/video`);
         const img = document.getElementById("video-frame");
 
         function receiveVideoFrameLoop() {
@@ -45,13 +45,12 @@
             setTimeout(receiveVideoFrameLoop, VIDEO_DELAY);
         }
 
-        function setupControlBtn(id, cmd) {
+        function setupControlBtn(id, path) {
             const element = document.getElementById(id);
-            element.addEventListener("click", () => control.send(cmd));
+            element.addEventListener("click", () => fetch(`http://${ADDRESS}${path}`, {method: "PUT"}));
         }
 
         camera.onerror = (event) => img.alt = "camera websocket error";
-        control.onerror = (event) => img.alt = "control websocket error";
 
         camera.binaryType = "arraybuffer";
         camera.onopen = (event) => receiveVideoFrameLoop();
@@ -60,9 +59,9 @@
             const result = btoa([].reduce.call(uint_data, (p, c) => p + String.fromCharCode(c), ""));
             img.src = "data:image/jpeg;base64," + result;
         };
-        setupControlBtn("decrease-btn", "d");
-        setupControlBtn("increase-btn", "i");
-        setupControlBtn("led-btn", "l");
+        setupControlBtn("increase-btn", "/control/resolution/increase");
+        setupControlBtn("decrease-btn", "/control/resolution/decrease");
+        setupControlBtn("led-btn", "/control/led/switch");
     })();
 </script>
 </body>

@@ -8,6 +8,13 @@
 
 #define IS_WS_CMD(ws_pkt, cmd) (ws_pkt.type == WS_CMD_TYPE && strcmp((char *) ws_pkt.payload, cmd) == 0)
 
+#define REGISTER_ROUTE_HANDLER(server, name) do { \
+    ESP_ERROR_CHECK_RETURN_MSG(           \
+        httpd_register_uri_handler(server, &name), \
+        STRINGIFY(name) " httpd_register_uri_handler failed"); \
+    ESP_LOGI(TAG, STRINGIFY(name) " registered"); \
+} while(0)
+
 static const char *TAG = "esp32-cam-web-server";
 
 static const char *INDEX_HTML =
@@ -49,8 +56,8 @@ static const char *INDEX_HTML =
         "<script>"
         "    (function () {"
         "        const VIDEO_DELAY = 125;"
-        "        const camera = new WebSocket(\"ws://192.168.4.1:80/video\");"
-        "        const control = new WebSocket(\"ws://192.168.4.1:80/control\");"
+        "        const ADDRESS = \"192.168.4.1:80\";"
+        "        const camera = new WebSocket(`ws://${ADDRESS}/video`);"
         "        const img = document.getElementById(\"video-frame\");"
         ""
         "        function receiveVideoFrameLoop() {"
@@ -58,13 +65,12 @@ static const char *INDEX_HTML =
         "            setTimeout(receiveVideoFrameLoop, VIDEO_DELAY);"
         "        }"
         ""
-        "        function setupControlBtn(id, cmd) {"
+        "        function setupControlBtn(id, path) {"
         "            const element = document.getElementById(id);"
-        "            element.addEventListener(\"click\", () => control.send(cmd));"
+        "            element.addEventListener(\"click\", () => fetch(`http://${ADDRESS}${path}`, {method: \"PUT\"}));"
         "        }"
         ""
         "        camera.onerror = (event) => img.alt = \"camera websocket error\";"
-        "        control.onerror = (event) => img.alt = \"control websocket error\";"
         ""
         "        camera.binaryType = \"arraybuffer\";"
         "        camera.onopen = (event) => receiveVideoFrameLoop();"
@@ -73,9 +79,9 @@ static const char *INDEX_HTML =
         "            const result = btoa([].reduce.call(uint_data, (p, c) => p + String.fromCharCode(c), \"\"));"
         "            img.src = \"data:image/jpeg;base64,\" + result;"
         "        };"
-        "        setupControlBtn(\"decrease-btn\", \"d\");"
-        "        setupControlBtn(\"increase-btn\", \"i\");"
-        "        setupControlBtn(\"led-btn\", \"l\");"
+        "        setupControlBtn(\"increase-btn\", \"/control/resolution/increase\");"
+        "        setupControlBtn(\"decrease-btn\", \"/control/resolution/decrease\");"
+        "        setupControlBtn(\"led-btn\", \"/control/led/switch\");"
         "    })();"
         "</script>"
         "</body>"
@@ -185,37 +191,45 @@ static const httpd_uri_t VIDEO_WS = {
         .is_websocket = true
 };
 
-static esp_err_t control_handler(
+static esp_err_t control_resolution_increase_handler(
         httpd_req_t *req
 ) {
-    if (req->method == HTTP_GET) {
-        ESP_LOGI(TAG, "control_handler - handshake done after new connection was opened");
-        return ESP_OK;
-    }
-    ESP_LOGI(TAG, "running control_handler with no handshake");
-
-    esp_err_t ret = ESP_OK;
-    uint8_t *buf = NULL;
-    httpd_ws_frame_t ws_recv_pkt;
-
-    ESP_ERROR_CHECK_RETURN(receive_ws_pkt(req, &ws_recv_pkt, &buf));
-    if (IS_WS_CMD(ws_recv_pkt, WS_CMD_INCREASE_RESOLUTION)) {
-        ret = change_camera_resolution_by(+1);
-    } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_DECREASE_RESOLUTION)) {
-        ret = change_camera_resolution_by(-1);
-    } else if (IS_WS_CMD(ws_recv_pkt, WS_CMD_CHANGE_FLASH_LED)) {
-        ret = switch_flash_led();
-    } else {
-        ESP_LOGE(TAG, "received unknown command on control socket");
-    }
-    free_ptr(&buf);
-    return ret;
+    ESP_LOGI(TAG, "running control_resolution_increase_handler");
+    return change_camera_resolution_by(+1);
 }
 
-static const httpd_uri_t CONTROL_WS = {
-        .uri        = "/control",
-        .method     = HTTP_GET,
-        .handler    = control_handler,
+static const httpd_uri_t ROUTE_CONTROL_RESOLUTION_INCREASE = {
+        .uri        = "/control/resolution/increase",
+        .method     = HTTP_PUT,
+        .handler    = control_resolution_increase_handler,
+        .user_ctx   = NULL
+};
+
+static esp_err_t control_resolution_decrease_handler(
+        httpd_req_t *req
+) {
+    ESP_LOGI(TAG, "running control_resolution_decrease_handler");
+    return change_camera_resolution_by(-1);
+}
+
+static const httpd_uri_t ROUTE_CONTROL_RESOLUTION_DECREASE = {
+        .uri        = "/control/resolution/decrease",
+        .method     = HTTP_PUT,
+        .handler    = control_resolution_decrease_handler,
+        .user_ctx   = NULL
+};
+
+static esp_err_t control_flash_led_switch_handler(
+        httpd_req_t *req
+) {
+    ESP_LOGI(TAG, "running control_flash_led_switch_handler");
+    return switch_flash_led();
+}
+
+static const httpd_uri_t ROUTE_CONTROL_LED_SWITCH = {
+        .uri        = "/control/led/switch",
+        .method     = HTTP_PUT,
+        .handler    = control_flash_led_switch_handler,
         .user_ctx   = NULL,
         .is_websocket = true
 };
@@ -223,7 +237,7 @@ static const httpd_uri_t CONTROL_WS = {
 static esp_err_t index_handler(
         httpd_req_t *req
 ) {
-    return httpd_resp_send(req, INDEX_HTML, HTTPD_RESP_USE_STRLEN);
+    return httpd_resp_sendstr(req, INDEX_HTML);
 }
 
 static const httpd_uri_t INDEX = {
@@ -244,17 +258,11 @@ esp_err_t start_webserver() {
 
     ESP_LOGI(TAG, "registering URI handlers");
 
-    ESP_ERROR_CHECK_RETURN_MSG(httpd_register_uri_handler(server, &VIDEO_WS),
-                               "VIDEO_WS httpd_register_uri_handler failed");
-    ESP_LOGI(TAG, "VIDEO_WS registered");
-
-    ESP_ERROR_CHECK_RETURN_MSG(httpd_register_uri_handler(server, &CONTROL_WS),
-                               "CONTROL_WS httpd_register_uri_handler failed");
-    ESP_LOGI(TAG, "CONTROL_WS registered");
-
-    ESP_ERROR_CHECK_RETURN_MSG(httpd_register_uri_handler(server, &INDEX),
-                               "INDEX httpd_register_uri_handler failed");
-    ESP_LOGI(TAG, "INDEX registered");
+    REGISTER_ROUTE_HANDLER(server, VIDEO_WS);
+    REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_INCREASE);
+    REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_DECREASE);
+    REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_LED_SWITCH);
+    REGISTER_ROUTE_HANDLER(server, INDEX);
 
     return ret;
 }

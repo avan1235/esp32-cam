@@ -11,9 +11,6 @@
 
 #define WS_CMD_TYPE HTTPD_WS_TYPE_TEXT
 #define WS_CMD_SHOOT "s"
-#define WS_CMD_INCREASE_RESOLUTION "i"
-#define WS_CMD_DECREASE_RESOLUTION "d"
-#define WS_CMD_CHANGE_FLASH_LED "l"
 
 esp_err_t start_webserver();
 

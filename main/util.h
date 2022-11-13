@@ -16,4 +16,6 @@
     }                                  \
 } while(0)
 
+#define STRINGIFY(x) #x
+
 #endif //ESP32CAM_UTIL_H
