@@ -25,7 +25,7 @@ class WsClient:
 
     def read(self):
         try:
-            return self.ws.recv_data(control_frame=False)
+            return self.ws.recv_data()
         except:
             return None, None
 
@@ -40,7 +40,7 @@ class WsClient:
 class Camera:
     def __init__(self, camera_ip="192.168.4.1", recv_port=80):
         def control_url(path):
-            requests.put(f"http://{camera_ip}:{recv_port}{path}")
+            requests.put(f"http://{camera_ip}:{recv_port}/control{path}")
 
         self.control = control_url
         self.video = WsClient(camera_ip, recv_port, "/video")
@@ -61,10 +61,10 @@ class Camera:
         return cv2.imdecode(array, cv2.IMREAD_UNCHANGED)
 
     def increase_quality(self):
-        self.control("/control/resolution/increase")
+        self.control("/resolution/increase")
 
     def decrease_quality(self):
-        self.control("/control/resolution/decrease")
+        self.control("/resolution/decrease")
 
     def switch_flash_led(self):
-        self.control("/control/led/switch")
+        self.control("/led/switch")
