@@ -4,7 +4,7 @@ CONTAINER_NAME="espressif_idf_camera"
 IMAGE_TAG="avan1235/espressif-idf-camera:0.1"
 
 ssh-keygen -f "/home/avan1235/.ssh/known_hosts" -R "[localhost]:2222"
-docker build --build-arg UID="$(id -u)" -t "${IMAGE_TAG}" -f Dockerfile .
+docker build -t "${IMAGE_TAG}" -f Dockerfile .
 docker stop "${CONTAINER_NAME}"
 docker rm "${CONTAINER_NAME}"
 if [[ "$*" == *"--no-device"* ]]
