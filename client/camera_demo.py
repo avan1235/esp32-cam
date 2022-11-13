@@ -24,7 +24,7 @@ def main():
             elif keypress == ord("-"):
                 cam.decrease_quality()
             elif keypress == ord("l"):
-                cam.change_flash_led()
+                cam.switch_flash_led()
     cv2.destroyWindow(WINDOW_NAME)
 
 

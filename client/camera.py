@@ -1,4 +1,5 @@
 import websocket
+import requests
 import numpy as np
 import cv2
 
@@ -37,17 +38,20 @@ class WsClient:
 
 
 class Camera:
-    def __init__(self, camera_ip="192.168.4.1", recv_port=80, video_path="/video", control_path="/control"):
-        self.video = WsClient(camera_ip, recv_port, video_path)
-        self.control = WsClient(camera_ip, recv_port, control_path)
+    def __init__(self, camera_ip="192.168.4.1", recv_port=80):
+        def control_url(path):
+            print("before put")
+            requests.put(f"http://{camera_ip}:{recv_port}{path}")
+            print("after put")
+
+        self.control = control_url
+        self.video = WsClient(camera_ip, recv_port, "/video")
 
     def __enter__(self):
         self.video = self.video.__enter__()
-        self.control = self.control.__enter__()
         return self
 
     def __exit__(self, *args, **kwargs):
-        self.control.__exit__(*args, **kwargs)
         self.video.__exit__(*args, **kwargs)
 
     def get_frame(self):
@@ -59,10 +63,10 @@ class Camera:
         return cv2.imdecode(array, cv2.IMREAD_UNCHANGED)
 
     def increase_quality(self):
-        self.control.write("i")
+        self.control("/control/resolution/increase")
 
     def decrease_quality(self):
-        self.control.write("d")
+        self.control("/control/resolution/decrease")
 
-    def change_flash_led(self):
-        self.control.write("l")
+    def switch_flash_led(self):
+        self.control("/control/led/switch")
