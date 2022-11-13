@@ -12,6 +12,6 @@
 #define ESP_WIFI_PASS CONFIG_ESP_WIFI_PASS
 #define ESP_WIFI_SSID_FORMAT "CAR-%02X%02X%02X%02X%02X%02X"
 
-void wifi_init_ap();
+esp_err_t wifi_init_ap();
 
 #endif //ESP32CAM_WIFI_AP_H

@@ -4,7 +4,7 @@ static const char *TAG = "esp32-cam-flash-led";
 
 static bool LED_STATE = 0;
 
-esp_err_t configure_flash_led() {
+esp_err_t init_flash_led() {
     esp_err_t ret = ESP_OK;
     ESP_ERROR_CHECK_RETURN_MSG(gpio_reset_pin(FLASH_LED_GPIO),
                                "flash led pin cannot be reset");

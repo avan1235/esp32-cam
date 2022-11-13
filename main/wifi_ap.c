@@ -17,8 +17,9 @@ static void wifi_event_handler(
     }
 }
 
-void wifi_init_ap() {
+esp_err_t wifi_init_ap() {
     esp_netif_create_default_wifi_ap();
+
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
     ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_EVENT,
@@ -53,4 +54,5 @@ void wifi_init_ap() {
              ESP_WIFI_PASS,
              ESP_WIFI_CHANNEL
     );
+    return ESP_OK;
 }

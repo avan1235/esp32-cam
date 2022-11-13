@@ -8,7 +8,7 @@
 
 #define FLASH_LED_GPIO GPIO_NUM_4
 
-esp_err_t configure_flash_led();
+esp_err_t init_flash_led();
 
 esp_err_t switch_flash_led();
 
