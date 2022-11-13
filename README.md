@@ -4,7 +4,8 @@
 
 - ✅ provide custom environment for development on ESP32-CAM with Docker and CLion
 - ✅ implement ESP32 camera stream over websocket
-- ✅ implement ESP32 control stream over websocket
+- ✅ implement ESP32 control using REST API
+- ✅ add options to create access point or connect to an existing station
 - ✅ provide simple js client served by ESP32
 - ✅ provide sample of python client with opencv
 
@@ -18,7 +19,21 @@ and select a remote toolchains option to connect to image over ssh.
 
 By default, script shares with docker image `/dev/ttyUSB0` device which is usually an ESP32
 module connected to USB port. You should adjust this configuration to your needs and rerun
-[`start.sh`](./env/start.sh) script.
+[`start.sh`](./env/start.sh) script (you can add `--no-device` option as well).
+
+## Build configuration
+
+You should configure your build with
+
+```bash
+idf.py menuconfig
+```
+
+executed in remote container.
+
+It allows to change compiler options and log level as well as manage all modules from ESP IDF.
+It is standard procedure to update configuration from IDF when version of SDK has changed.
+
 
 ## Flashing project
 
@@ -31,15 +46,3 @@ idf.py flash monitor
 
 After flashing compiled program to ESP32, serial monitor will be opened in console,
 so you can easily debug log data in terminal. You can stop it with `Ctrl+]`
-
-## Build configuration
-
-You can configure your build with
-
-```bash
-idf.py menuconfig
-```
-
-executed in remote container. It allows to change compiler options and log level
-as well as manage all modules from ESP IDF.
-
