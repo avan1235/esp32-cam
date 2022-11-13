@@ -40,9 +40,7 @@ class WsClient:
 class Camera:
     def __init__(self, camera_ip="192.168.4.1", recv_port=80):
         def control_url(path):
-            print("before put")
             requests.put(f"http://{camera_ip}:{recv_port}{path}")
-            print("after put")
 
         self.control = control_url
         self.video = WsClient(camera_ip, recv_port, "/video")

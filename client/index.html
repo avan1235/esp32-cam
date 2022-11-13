@@ -35,24 +35,23 @@
 </div>
 <script>
     (function () {
-        const VIDEO_DELAY = 125;
-        const ADDRESS = "192.168.4.1:80";
-        const camera = new WebSocket(`ws://${ADDRESS}/video`);
+        const video_delay_ms = 100;
+        const url = `${window.location.host}:${window.location.port}`;
+        const camera = new WebSocket(`ws://${url}/video`);
         const img = document.getElementById("video-frame");
 
         function receiveVideoFrameLoop() {
             camera.send("s");
-            setTimeout(receiveVideoFrameLoop, VIDEO_DELAY);
+            setTimeout(receiveVideoFrameLoop, video_delay_ms);
         }
 
         function setupControlBtn(id, path) {
             const element = document.getElementById(id);
-            element.addEventListener("click", () => fetch(`http://${ADDRESS}${path}`, {method: "PUT"}));
+            element.addEventListener("click", () => fetch(`http://${url}${path}`, {method: "PUT"}));
         }
 
-        camera.onerror = (event) => img.alt = "camera websocket error";
-
         camera.binaryType = "arraybuffer";
+        camera.onerror = (event) => img.alt = "camera websocket error";
         camera.onopen = (event) => receiveVideoFrameLoop();
         camera.onmessage = (event) => {
             const uint_data = new Uint8Array(event.data);
