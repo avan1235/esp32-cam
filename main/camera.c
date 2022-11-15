@@ -28,7 +28,7 @@ static camera_config_t camera_config = {
         .pixel_format = PIXFORMAT_JPEG,
         .frame_size = FRAMESIZE_HD,
         .jpeg_quality = 12,
-        .fb_count = 1,
+        .fb_count = 4,
         .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
 };
 
