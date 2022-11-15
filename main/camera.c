@@ -27,9 +27,10 @@ static camera_config_t camera_config = {
 
         .pixel_format = PIXFORMAT_JPEG,
         .frame_size = FRAMESIZE_SVGA,
-        .jpeg_quality = 12,
-        .fb_count = 2,
-        .grab_mode = CAMERA_GRAB_WHEN_EMPTY,
+        .jpeg_quality = 10,
+        .fb_count = 4,
+        .fb_location = CAMERA_FB_IN_PSRAM,
+        .grab_mode = CAMERA_GRAB_LATEST,
 };
 
 esp_err_t init_camera() {
