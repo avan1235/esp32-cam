@@ -94,6 +94,17 @@ static const char *INDEX_HTML =
         "</body>"
         "</html>";
 
+static const char STREAM_CONTENT_TYPE[] = "multipart/x-mixed-replace;boundary=" HTTP_PART_BOUNDARY;
+
+static const char STREAM_BOUNDARY[] = "\r\n--" HTTP_PART_BOUNDARY "\r\n";
+
+static const ssize_t STREAM_BOUNDARY_LENGTH = STRLEN(STREAM_BOUNDARY);
+
+static const char STREAM_HEADERS[] = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
+
+static const ssize_t STREAM_HEADERS_MAX_LENGTH = STRLEN(STREAM_HEADERS) + MAX_NUMBER_DIGITS;
+
+
 static esp_err_t receive_frame_len(
         httpd_req_t *req,
         httpd_ws_frame_t *ws_pkt
@@ -130,11 +141,15 @@ static esp_err_t receive_frame_payload(
     return ESP_OK;
 }
 
-static esp_err_t send_picture(
+static FORCE_INLINE esp_err_t ws_send_picture(
         httpd_req_t *req
 ) {
-    ESP_LOGI(TAG, "taking picture");
+    ESP_LOGI(TAG, "ws taking picture");
     camera_fb_t *pic = esp_camera_fb_get();
+    if (!pic) {
+        esp_camera_fb_return(pic);
+        return ESP_FAIL;
+    }
     ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
 
     httpd_ws_frame_t ws_send_pkt;
@@ -182,7 +197,7 @@ static esp_err_t video_handler(
 
     ESP_ERROR_CHECK_RETURN(receive_ws_pkt(req, &ws_recv_pkt, &buf));
     if (IS_WS_CMD(ws_recv_pkt, WS_CMD_SHOOT)) {
-        ret = send_picture(req);
+        ret = ws_send_picture(req);
     } else {
         ESP_LOGE(TAG, "received unknown command on video socket");
     }
@@ -254,6 +269,59 @@ static const httpd_uri_t INDEX = {
         .user_ctx  = NULL
 };
 
+static FORCE_INLINE esp_err_t http_send_picture(
+        httpd_req_t *req
+) {
+    ESP_LOGI(TAG, "http taking picture");
+    camera_fb_t *pic = esp_camera_fb_get();
+    if (!pic) {
+        esp_camera_fb_return(pic);
+        return ESP_FAIL;
+    }
+    ESP_LOGI(TAG, "picture taken - size = %zu bytes", pic->len);
+
+    char *part_buf[STREAM_HEADERS_MAX_LENGTH];
+    ssize_t headers_length = snprintf((char *) part_buf, STREAM_HEADERS_MAX_LENGTH, STREAM_HEADERS, pic->len);
+    esp_err_t ret = httpd_resp_send_chunk(req, (const char *) part_buf, headers_length);
+
+    if (ret == ESP_OK) {
+        ret = httpd_resp_send_chunk(req, (const char *) pic->buf, (ssize_t) pic->len);
+    }
+    if (ret == ESP_OK) {
+        ret = httpd_resp_send_chunk(req, STREAM_BOUNDARY, STREAM_BOUNDARY_LENGTH);
+    }
+    esp_camera_fb_return(pic);
+
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "http_send_picture failed sending frame");
+    }
+    return ret;
+}
+
+static esp_err_t stream_handler(httpd_req_t *req) {
+    ESP_LOGI(TAG, "running stream_handler");
+    esp_err_t ret = ESP_OK;
+
+    ret = httpd_resp_set_type(req, STREAM_CONTENT_TYPE);
+    if (ret != ESP_OK) {
+        return ret;
+    }
+    while (true) {
+        ret = http_send_picture(req);
+        if (ret != ESP_OK) {
+            break;
+        }
+    }
+    return ret;
+}
+
+static const httpd_uri_t STREAM = {
+        .uri       = "/stream",
+        .method    = HTTP_GET,
+        .handler   = stream_handler,
+        .user_ctx  = NULL
+};
+
 esp_err_t start_webserver() {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -269,6 +337,7 @@ esp_err_t start_webserver() {
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_INCREASE);
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_DECREASE);
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_LED_SWITCH);
+    REGISTER_ROUTE_HANDLER(server, STREAM);
     REGISTER_ROUTE_HANDLER(server, INDEX);
 
     return ret;

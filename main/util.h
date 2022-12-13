@@ -18,4 +18,8 @@
 
 #define STRINGIFY(x) #x
 
+#define STRLEN(s) (sizeof(s) / sizeof(s[0]))
+
+# define FORCE_INLINE __attribute__((always_inline)) inline
+
 #endif //ESP32CAM_UTIL_H
