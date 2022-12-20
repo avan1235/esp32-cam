@@ -9,7 +9,7 @@ ffmpeg \
   -use_wallclock_as_timestamps 1 \
   -i http://192.168.0.170/stream \
   -f rtsp \
-  -rtsp_transport tcp rtsp://localhost:8554/stream \
+  -rtsp_transport tcp rtsp://0.0.0.0:8554/stream \
   -an \
   -f segment \
   -vf setpts=PTS-STARTPTS \
