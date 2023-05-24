@@ -1,7 +1,7 @@
 #!/bin/bash
 
 CONTAINER_NAME="espressif_idf_camera"
-IMAGE_TAG="avan1235/espressif-idf-camera:0.1"
+IMAGE_TAG="avan1235/espressif-idf-camera:5.0.1"
 
 ssh-keygen -f "/home/avan1235/.ssh/known_hosts" -R "[localhost]:2222"
 docker build -t "${IMAGE_TAG}" -f Dockerfile .

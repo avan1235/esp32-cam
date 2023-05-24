@@ -57,9 +57,10 @@ RUN apt-get update  \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3 10
 
 RUN cd /opt && \
-    git clone --recursive https://github.com/espressif/esp-idf.git && \
-    cd esp-idf && \
-    git checkout tags/v5.0-rc1 -b latest
+    git clone --recursive https://github.com/espressif/esp-idf.git
+
+RUN cd /opt/esp-idf && \
+    git checkout tags/v5.0.1 -b latest
 
 RUN cd /opt/esp-idf && git submodule update --init --recursive && ./install.sh all
 RUN echo "if [ -f /root/.bashrc ]; then source /root/.bashrc; fi" >> /root/.bash_profile
