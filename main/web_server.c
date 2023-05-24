@@ -256,6 +256,21 @@ static const httpd_uri_t ROUTE_CONTROL_LED_SWITCH = {
         .is_websocket = true
 };
 
+static esp_err_t control_display_switch_handler(
+        httpd_req_t *req
+) {
+    ESP_LOGI(TAG, "running control_display_switch_handler");
+    RESPOND_STATUS(req, switch_flash_led());
+}
+
+static const httpd_uri_t ROUTE_CONTROL_DISPLAY_SWITCH = {
+        .uri        = "/control/display/switch",
+        .method     = HTTP_PUT,
+        .handler    = control_display_switch_handler,
+        .user_ctx   = NULL,
+        .is_websocket = true
+};
+
 static esp_err_t index_handler(
         httpd_req_t *req
 ) {
@@ -337,6 +352,7 @@ esp_err_t start_webserver() {
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_INCREASE);
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_DECREASE);
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_LED_SWITCH);
+    REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_DISPLAY_SWITCH);
     REGISTER_ROUTE_HANDLER(server, STREAM);
     REGISTER_ROUTE_HANDLER(server, INDEX);
 
