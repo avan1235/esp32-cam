@@ -7,9 +7,7 @@
 #include "memory.h"
 
 #if CONFIG_ESP_WIFI_MODE_ACCESS_POINT
-
 #include "wifi_ap.h"
-
 #define init_wifi wifi_init_ap
 #elif CONFIG_ESP_WIFI_MODE_STATION
 #include "wifi_sta.h"
