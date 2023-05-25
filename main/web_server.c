@@ -59,6 +59,7 @@ static const char *INDEX_HTML =
         "<div id=\"btn-container\">"
         "    <button id=\"decrease-btn\">-</button>"
         "    <button id=\"led-btn\">LED</button>"
+        "    <button id=\"display-btn\">DISPLAY</button>"
         "    <button id=\"increase-btn\">+</button>"
         "</div>"
         "<script>"
@@ -89,6 +90,7 @@ static const char *INDEX_HTML =
         "        setupControlBtn(\"increase-btn\", \"/control/resolution/increase\");"
         "        setupControlBtn(\"decrease-btn\", \"/control/resolution/decrease\");"
         "        setupControlBtn(\"led-btn\", \"/control/led/switch\");"
+        "        setupControlBtn(\"display-btn\", \"/control/display/switch\");"
         "    })();"
         "</script>"
         "</body>"
@@ -260,7 +262,8 @@ static esp_err_t control_display_switch_handler(
         httpd_req_t *req
 ) {
     ESP_LOGI(TAG, "running control_display_switch_handler");
-    RESPOND_STATUS(req, switch_flash_led());
+    switch_display();
+    return httpd_resp_sendstr(req, NULL);
 }
 
 static const httpd_uri_t ROUTE_CONTROL_DISPLAY_SWITCH = {
@@ -337,7 +340,7 @@ static const httpd_uri_t STREAM = {
         .user_ctx  = NULL
 };
 
-esp_err_t start_webserver() {
+esp_err_t init_webserver() {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 

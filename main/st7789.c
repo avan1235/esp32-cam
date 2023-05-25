@@ -1,17 +1,4 @@
-#include <string.h>
-#include <inttypes.h>
-#include <math.h>
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-
-#include <driver/spi_master.h>
-#include <driver/gpio.h>
-#include "esp_log.h"
-
 #include "st7789.h"
-
-#define TAG "ST7789"
 
 #if CONFIG_SPI2_HOST
 #define HOST_ID SPI2_HOST
@@ -19,9 +6,11 @@
 #define HOST_ID SPI3_HOST
 #endif
 
-static const int SPI_COMMAND_MODE = 0;
-static const int SPI_DATA_MODE = 1;
-static const int SPI_FREQUENCY = SPI_MASTER_FREQ_20M;
+#define SPI_COMMAND_MODE 0
+#define SPI_DATA_MODE 1
+#define SPI_FREQUENCY SPI_MASTER_FREQ_20M
+
+static const char *TAG = "esp32-cam-st7789";
 
 static void delay_ms(TickType_t ms) {
     TickType_t xTicksToDelay = (ms + (portTICK_PERIOD_MS - 1)) / portTICK_PERIOD_MS;
@@ -162,7 +151,7 @@ spi_master_init(
     spi_device_handle_t handle;
     ret = spi_bus_add_device(HOST_ID, &devcfg, &handle);
     ESP_LOGD(TAG, "spi_bus_add_device=%d", ret);
-    assert(ret == ESP_OK);
+    ESP_ERROR_CHECK(ret);
     dev->_dc = GPIO_DC;
     dev->_bl = GPIO_BL;
     dev->_handle = handle;

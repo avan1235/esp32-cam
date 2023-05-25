@@ -8,6 +8,7 @@
 #include "util.h"
 #include "camera.h"
 #include "flash_led.h"
+#include "camera_screen.h"
 
 #define WS_CMD_TYPE HTTPD_WS_TYPE_TEXT
 #define WS_CMD_SHOOT "s"
@@ -15,6 +16,6 @@
 #define HTTP_PART_BOUNDARY "123456789000000000000987654321"
 #define MAX_NUMBER_DIGITS 11
 
-esp_err_t start_webserver();
+esp_err_t init_webserver();
 
 #endif //ESP32CAM_WEB_SERVER_H

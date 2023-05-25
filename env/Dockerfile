@@ -24,7 +24,7 @@ RUN apt-get update  \
         rsync \
         tar \
         python \
-        python-dev \
+        python-DISPLAY_DEV \
         apt-utils \
         bison \
         ca-certificates \
@@ -38,11 +38,11 @@ RUN apt-get update  \
         git-lfs \
         gperf \
         lcov \
-        libbsd-dev \
-        libffi-dev \
-        libncurses-dev \
-        libssl-dev  \
-        libusb-1.0-0-dev \
+        libbsd-DISPLAY_DEV \
+        libffi-DISPLAY_DEV \
+        libncurses-DISPLAY_DEV \
+        libssl-DISPLAY_DEV  \
+        libusb-1.0-0-DISPLAY_DEV \
         make \
         ninja-build \
         python3 \

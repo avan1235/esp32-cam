@@ -83,35 +83,35 @@ menu "ESP WebServer Camera Configuration"
 		default 48 if IDF_TARGET_ESP32S3
 		default 19 if IDF_TARGET_ESP32C3
 
-	config WIDTH
+	config SCREEN_WIDTH
 		int "SCREEN WIDTH"
 		range 0 999
 		default 240
 		help
 			The width resolution of the screen.
 
-	config HEIGHT
+	config SCREEN_HEIGHT
 		int "SCREEN HEIGHT"
 		range 0 999
 		default 240
 		help
 			The height resolution of the screen.
 
-	config OFFSETX
+	config SCREEN_OFFSETX
 		int "GRAM X OFFSET"
 		range 0 99
 		default 0
 		help
 			When your TFT have offset(X), set it.
 
-	config OFFSETY
+	config SCREEN_OFFSETY
 		int "GRAM Y OFFSET"
 		range 0 99
 		default 0
 		help
 			When your TFT have offset(Y), set it.
 
-	config MOSI_GPIO
+	config SCREEN_MOSI_GPIO
 		int "MOSI GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 13
@@ -121,7 +121,7 @@ menu "ESP WebServer Camera Configuration"
 			On the ESP32, GPIOs 35-39 are input-only so cannot be used as outputs.
 			On the ESP32-S2, GPIO 46 is input-only so cannot be used as outputs.
 
-	config SCLK_GPIO
+	config SCREEN_SCLK_GPIO
 		int "SCLK GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 12
@@ -131,7 +131,7 @@ menu "ESP WebServer Camera Configuration"
 			On the ESP32, GPIOs 35-39 are input-only so cannot be used as outputs.
 			On the ESP32-S2, GPIO 46 is input-only so cannot be used as outputs.
 
-	config CS_GPIO
+	config SCREEN_CS_GPIO
 		int "CS GPIO number"
 		range -1 GPIO_RANGE_MAX
 		default -1
@@ -142,7 +142,7 @@ menu "ESP WebServer Camera Configuration"
 			On the ESP32, GPIOs 35-39 are input-only so cannot be used as outputs.
 			On the ESP32-S2, GPIO 46 is input-only so cannot be used as outputs.
 
-	config DC_GPIO
+	config SCREEN_DC_GPIO
 		int "DC GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 14
@@ -152,7 +152,7 @@ menu "ESP WebServer Camera Configuration"
 			On the ESP32, GPIOs 35-39 are input-only so cannot be used as outputs.
 			On the ESP32-S2, GPIO 46 is input-only so cannot be used as outputs.
 
-	config RESET_GPIO
+	config SCREEN_RESET_GPIO
 		int "RESET GPIO number"
 		range 0 GPIO_RANGE_MAX
 		default 15
@@ -162,7 +162,7 @@ menu "ESP WebServer Camera Configuration"
 			On the ESP32, GPIOs 35-39 are input-only so cannot be used as outputs.
 			On the ESP32-S2, GPIO 46 is input-only so cannot be used as outputs.
 
-	config BL_GPIO
+	config SCREEN_BL_GPIO
 		int "BACKLIGHT GPIO number"
 		range -1 GPIO_RANGE_MAX
 		default 2
@@ -173,13 +173,13 @@ menu "ESP WebServer Camera Configuration"
 			On the ESP32, GPIOs 35-39 are input-only so cannot be used as outputs.
 			On the ESP32-S2, GPIO 46 is input-only so cannot be used as outputs.
 
-	config INVERSION
+	config SCREEN_INVERSION
 		bool "Enable Display Inversion"
 		default false
 		help
 			Enable Display Inversion.
 
-	choice SPI_HOST
+	choice SCREEN_SPI_HOST
 		prompt "SPI peripheral that controls this bus"
 		default SPI2_HOST
 		help

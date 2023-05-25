@@ -18,7 +18,7 @@ docker environment with ESP IDF with camera installed.
 You can easily connect to this environment from CLion. Just use toolchains configuration
 and select a remote toolchains option to connect to image over ssh.
 
-By default, script shares with docker image `/dev/ttyUSB0` device which is usually an ESP32
+By default, script shares with docker image `/DISPLAY_DEV/ttyUSB0` device which is usually an ESP32
 module connected to USB port. You should adjust this configuration to your needs and rerun
 [`start.sh`](./env/start.sh) script (you can add `--no-device` option as well).
 
