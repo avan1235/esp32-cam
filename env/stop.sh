@@ -1,3 +1,5 @@
 #!/bin/bash
 
-docker stop espressif_idf_camera
+CONTAINER_NAME="espressif_idf_camera"
+
+docker stop "${CONTAINER_NAME}"
