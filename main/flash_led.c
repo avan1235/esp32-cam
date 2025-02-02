@@ -15,6 +15,10 @@ esp_err_t init_flash_led() {
 
 esp_err_t switch_flash_led() {
     bool led_state = !LED_STATE;
+    return change_flash_led(led_state);
+}
+
+esp_err_t change_flash_led(bool led_state) {
     ESP_LOGI(TAG, "switching led state to %d", led_state);
     LED_STATE = led_state;
     return gpio_set_level(FLASH_LED_GPIO, led_state);

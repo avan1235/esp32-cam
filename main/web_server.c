@@ -248,12 +248,39 @@ static esp_err_t control_flash_led_switch_handler(
     RESPOND_STATUS(req, switch_flash_led());
 }
 
+static esp_err_t control_flash_led_on_handler(
+        httpd_req_t *req
+) {
+    ESP_LOGI(TAG, "running control_flash_led_switch_handler");
+    RESPOND_STATUS(req, change_flash_led(true));
+}
+
+static esp_err_t control_flash_led_off_handler(
+        httpd_req_t *req
+) {
+    ESP_LOGI(TAG, "running control_flash_led_switch_handler");
+    RESPOND_STATUS(req, change_flash_led(false));
+}
+
 static const httpd_uri_t ROUTE_CONTROL_LED_SWITCH = {
         .uri        = "/control/led/switch",
         .method     = HTTP_PUT,
         .handler    = control_flash_led_switch_handler,
         .user_ctx   = NULL,
-        .is_websocket = true
+};
+
+static const httpd_uri_t ROUTE_CONTROL_LED_ON = {
+        .uri        = "/control/led/on",
+        .method     = HTTP_PUT,
+        .handler    = control_flash_led_on_handler,
+        .user_ctx   = NULL,
+};
+
+static const httpd_uri_t ROUTE_CONTROL_LED_OFF = {
+        .uri        = "/control/led/off",
+        .method     = HTTP_PUT,
+        .handler    = control_flash_led_off_handler,
+        .user_ctx   = NULL,
 };
 
 static esp_err_t index_handler(
@@ -337,6 +364,8 @@ esp_err_t start_webserver() {
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_INCREASE);
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_RESOLUTION_DECREASE);
     REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_LED_SWITCH);
+    REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_LED_ON);
+    REGISTER_ROUTE_HANDLER(server, ROUTE_CONTROL_LED_OFF);
     REGISTER_ROUTE_HANDLER(server, STREAM);
     REGISTER_ROUTE_HANDLER(server, INDEX);
 
