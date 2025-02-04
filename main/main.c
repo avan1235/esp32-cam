@@ -1,5 +1,7 @@
 #include <esp_netif.h>
 #include <esp_event.h>
+
+#include "sdcard.h"
 #include "camera.h"
 #include "flash_led.h"
 #include "web_server.h"
@@ -20,5 +22,7 @@ void app_main() {
     ESP_ERROR_CHECK(init_camera());
     ESP_ERROR_CHECK(init_flash_led());
     ESP_ERROR_CHECK(init_wifi());
+    ESP_ERROR_CHECK(init_sdcard());
     ESP_ERROR_CHECK(start_webserver());
+    ESP_ERROR_CHECK(start_photo_collect());
 }
